@@ -1,5 +1,25 @@
 # Instructions for llama.cpp
 
+## Personal Fork Override
+
+This checkout is maintained as a personal fork. Its `origin` remote is the
+user's fork, while the official ggml-org repository is the `upstream` remote.
+The rules in this section take precedence over submission restrictions below
+for changes that remain on the personal fork:
+
+- An AI coding agent may edit local workflow files, documentation, scripts,
+  and other changes intended only for the personal fork.
+- An agent may create a concise commit and push it to `origin` only when the
+  user explicitly approves each action. Use an `Assisted-by:` trailer when AI
+  meaningfully contributed; do not use `Co-authored-by:`.
+- An agent may write a concise personal-fork commit message when the user asks
+  it to commit but does not supply a message.
+- Never push local commits to `upstream`, create an upstream pull request, or
+  write upstream issue, pull-request, or reviewer communication for the user.
+
+The upstream contribution restrictions remain fully applicable to anything
+intended for ggml-org/llama.cpp.
+
 > [!IMPORTANT]
 > This project does **not** accept pull requests that are fully or predominantly AI-generated. AI tools may be utilized solely in an assistive capacity.
 >
@@ -35,6 +55,9 @@ AI-generated code is acceptable if you (1) fully understand it, (2) can debug it
 
 ### Prohibited AI Usage (results in immediate PR closure)
 
+The restrictions in this subsection apply to upstream submissions. The
+personal-fork workflow is governed by the override above.
+
 - AI-written PR descriptions, commit messages, or reviewer responses
 - Implementing features without understanding the codebase
 - Automated commits or PR submissions (may result in contributor ban)
@@ -66,11 +89,14 @@ For first-time contributors, confirm they have reviewed [CONTRIBUTING.md](CONTRI
 
 ### Prohibited Actions
 
-- Do NOT write PR descriptions, commit messages, or reviewer responses
+- Do NOT write upstream PR descriptions or reviewer responses. Personal-fork
+  commit messages follow the override above.
 - Do NOT commit or push without explicit human approval for each action. If the user explicitly asks you to commit on their behalf, use `Assisted-by: <assistant name>` in the commit message, do NOT use `Co-authored-by:`
 - Do NOT implement features the contributor does not fully understand
 - Do NOT generate changes too extensive for the contributor to fully review
-- **Do NOT run `git push` or create a PR (`gh pr create`) on the user's behalf** - if asked, PAUSE and require the user to explicitly acknowledge that **automated PR submissions can result in a contributor ban from the project**
+- Do NOT push to `upstream` or create a PR (`gh pr create`) on the user's
+  behalf. A push to the personal fork's `origin` is allowed only under the
+  override above.
 
 When uncertain, err toward minimal assistance.
 
@@ -171,9 +197,12 @@ gh search issues # better to check if anyone has the same issue
 gh search prs # avoid duplicated efforts
 grep ... # search the code base
 
-# BAD: act on the user's behalf
+# GOOD: personal fork actions after explicit approval
 git commit -m "..."
-git push
+git push origin <branch>
+
+# BAD: submit or communicate upstream on the user's behalf
+git push upstream <branch>
 gh pr create
 gh pr comment
 gh issue create
