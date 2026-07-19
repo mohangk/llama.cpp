@@ -13,12 +13,15 @@ The local Vulkan build is complete and usable:
 - `build-vulkan-amd/bin/llama-server`
 - `build-vulkan-amd/bin/llama-bench`
 - Release and native CPU optimization are enabled.
-- The Gemma 4 12B Q4 model fully offloads to the AMD integrated GPU.
 - Vulkan device discovery, CLI inference, server inference, and benchmarking
   have been tested.
-- The embedded Web UI and Gemma's native structured tool calling have been
-  tested with the built-in llama-server tools.
-- Gemma 4 multi-token prediction is enabled with the matching MTP sidecar.
+- The embedded Web UI and built-in llama-server tools have been tested.
+- The current launcher targets the validated
+  [Gemma 4 setup](doc-local/gemma4.md).
+- Qwen 3.6 27B text, vision, tool calling, and MTP have been validated; see
+  [the local Qwen MTP results](doc-local/qwen36-mtp-plan.md).
+- Repeatable model and backend comparisons use the
+  [local evaluation protocol](doc-local/local-evals.md).
 - Vulkan substantially outperformed the tested HIP build on this machine.
 
 Nothing else needs to be built for local chat, the HTTP API, the Web UI, basic
@@ -27,7 +30,7 @@ the build configuration.
 
 ## Quick start
 
-Start the server from anywhere:
+The current launcher starts the local Gemma 4 configuration:
 
 ```bash
 ./run_server.sh
@@ -35,93 +38,18 @@ Start the server from anywhere:
 
 Open `http://127.0.0.1:8080` in a browser. Stop the server with `Ctrl-C`.
 
-The launcher defaults are:
+Model paths, environment overrides, MTP behavior, and validated benchmark
+results are recorded in [the Gemma 4 document](doc-local/gemma4.md). The Qwen
+experiment currently uses its documented direct server command rather than
+this Gemma-specific launcher.
 
-- Binary: `build-vulkan-amd/bin/llama-server`
-- Model: `$HOME/models/gemma-4-12B-qat/gemma-4-12B-it-qat-UD-Q4_K_XL.gguf`
-- MTP model: `mtp-gemma-4-12B-it.gguf` beside the main model
-- Speculative draft window: up to 4 tokens
-- Context size: 32768
-- Server slots: 1
-- Address: `127.0.0.1:8080`
-- GPU: `Vulkan0`, with all model layers offloaded
+## TODO
 
-Override configurable values for one run:
-
-```bash
-LLAMA_MODEL=/path/to/model.gguf \
-LLAMA_MTP_MODEL=/path/to/mtp-model.gguf \
-LLAMA_SPEC_DRAFT_N_MAX=4 \
-LLAMA_PORT=8081 \
-LLAMA_CTX_SIZE=16384 \
-./run_server.sh
-```
-
-`LLAMA_SERVER_BIN` can select another llama-server build. The launcher keeps
-the host fixed to loopback and deliberately does not expose a host override.
-Set `LLAMA_ENABLE_MTP=0` to disable the drafter for comparison or to run a
-model without a matching Gemma 4 assistant sidecar.
-
-## Gemma 4 multi-token prediction
-
-The launcher enables Gemma 4's multi-token prediction support through
-speculative decoding. It passes these options to llama-server:
-
-```text
---spec-type draft-mtp
---model-draft /path/to/mtp-gemma-4-12B-it.gguf
---device-draft Vulkan0
---gpu-layers-draft 99
---spec-draft-n-max 4
-```
-
-The default MTP path is derived from the main model directory, so selecting a
-different `LLAMA_MODEL` also looks for `mtp-gemma-4-12B-it.gguf` in that
-directory. Set `LLAMA_MTP_MODEL` when the sidecar has a different name or
-location.
-
-The sidecar's GGUF metadata identifies it as a 423M `gemma4-assistant` model
-with four transformer blocks. The draft window is not constrained to four:
-the assistant proposes draft tokens autoregressively and llama.cpp stops at
-`LLAMA_SPEC_DRAFT_N_MAX`. Four is a conservative starting point. A larger
-window offers more potential accepted tokens but wastes more draft and target
-verification work when an early token is rejected.
-
-MTP is an inference optimization, not a larger context or a change to model
-quality. Draft tokens are checked by the main model before acceptance. The
-speed benefit depends on acceptance rate and the overhead of running the
-sidecar, so benchmark representative prompts before deciding whether to keep
-it enabled.
-
-### How Gemma 4 MTP differs from other drafters
-
-A conventional `draft-simple` model is a separate, smaller language model. It
-reads the accepted token sequence, predicts candidate tokens one at a time,
-and needs a tokenizer and vocabulary compatible with the target. It can be
-trained independently, but its predictions may diverge from the target and
-reduce the acceptance rate.
-
-Gemma 4's MTP assistant is target-specific rather than independent. It shares
-the target's input embedding table and builds on the target's last-layer
-activations. In llama.cpp, the Gemma 4 assistant also shares target KV memory.
-That tighter coupling gives a small drafter better information about what the
-target would predict, which should improve acceptance for its size. The
-assistant still proposes tokens autoregressively; "multi-token prediction"
-describes its role in producing a run of candidates for one parallel target
-verification step, not an unchecked replacement for target generation.
-
-Other supported target-specific approaches make different tradeoffs:
-
-- `draft-eagle3` uses a small one-layer autoregressive transformer that reads
-  selected target hidden states.
-- `draft-dflash` uses several transformer layers and block diffusion to emit a
-  whole candidate block in one forward pass.
-- `ngram-*` methods use repeated token patterns rather than another neural
-  model, so they need no sidecar but work best on repetitive text such as code.
-
-Google's Gemma 4 MTP overview is at
-<https://ai.google.dev/gemma/docs/mtp/overview>. The llama.cpp implementation
-overview is in [docs/speculative.md](docs/speculative.md).
+- Create a Qwen 3.6 server launcher using the validated target, vision
+  projector, MTP sidecar, and three-token draft window. Decide whether this
+  should be a separate script or a generalized model-selecting replacement for
+  `run_server.sh`, while preserving loopback binding and the explicit tool
+  allowlist.
 
 Monitor the AMD GPU from another terminal:
 
@@ -161,10 +89,6 @@ The UI also offers persistent approval choices. Do not use them for this
 configuration. If one is selected accidentally, revoke it in the Chat Tools
 settings. Permissions are stored in browser local storage, not enforced by the
 server.
-
-The tested Gemma GGUF contains a native tool-aware chat template. A chat
-completion test produced a valid structured `get_datetime` tool call, so no
-chat-template override is needed for this model.
 
 ### Tool implementation limits
 
@@ -248,9 +172,10 @@ Then test these calls through the Web UI with `Allow once`:
 
 Use the Vulkan backend with Mesa RADV on this laptop.
 
-Vulkan was substantially faster than the HIP/ROCm backend for the available
-12B Gemma 4 Q4 model. Vulkan also handled the integrated GPU's shared system
-memory without a special unified-memory environment variable.
+Vulkan was substantially faster than the tested HIP/ROCm backend. Vulkan also
+handled the integrated GPU's shared system memory without a special
+unified-memory environment variable. The model-specific comparison is in the
+[Gemma 4 benchmark](doc-local/gemma4.md#benchmark).
 
 ### System context
 
@@ -272,7 +197,7 @@ The system inspected on 2026-07-19 had:
 
 Although the firmware reports 4 GiB VRAM, this is an integrated GPU with
 unified memory. llama.cpp's Vulkan backend reported about 34 GiB usable device
-memory, enough to fully offload the 6.7 GB test model.
+memory and fully offloaded models larger than the dedicated VRAM aperture.
 
 Detected Vulkan capabilities included FP16 and integer dot products, KHR
 cooperative matrices, 64 KiB shared memory, and UMA support.
@@ -370,7 +295,7 @@ permissions on `/dev/dri/renderD128` before rebuilding.
 export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
 
 ./build-vulkan-amd/bin/llama-cli \
-  --model "$HOME/models/gemma-4-12B-qat/gemma-4-12B-it-qat-UD-Q4_K_XL.gguf" \
+  --model /path/to/model.gguf \
   --device Vulkan0 \
   --gpu-layers 99 \
   --flash-attn auto \
@@ -389,7 +314,7 @@ ideal maximum.
 export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
 
 ./build-vulkan-amd/bin/llama-bench \
-  --model "$HOME/models/gemma-4-12B-qat/gemma-4-12B-it-qat-UD-Q4_K_XL.gguf" \
+  --model /path/to/model.gguf \
   --n-prompt 512 \
   --n-gen 64 \
   --repetitions 3 \
@@ -399,12 +324,8 @@ export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
   --threads 8
 ```
 
-Measured Vulkan baseline:
-
-- Prompt processing: 118.7 tokens/second
-- Token generation: 7.63 tokens/second
-
-These are comparison baselines, not guarantees. Power mode, temperature,
+Use [the local evaluation protocol](doc-local/local-evals.md) for comparable
+model and speculative-decoding measurements. Power mode, temperature,
 background work, context size, quantization, and driver updates affect results.
 The APU shares thermal and power limits between CPU and GPU.
 
@@ -427,15 +348,11 @@ dedicated VRAM aperture:
 export GGML_CUDA_ENABLE_UNIFIED_MEMORY=1
 ```
 
-The same model and benchmark settings produced:
-
-- Vulkan: 118.7 prompt tokens/second, 7.63 generation tokens/second
-- HIP: 80.4 prompt tokens/second, 5.29 generation tokens/second
-
-Vulkan was about 48 percent faster for prompt processing and 44 percent faster
-for generation. Enabling `GGML_HIP_ROCWMMA_FATTN=ON` failed compilation because
-the installed rocWMMA 7.1 headers reported `Unsupported architecture` for
-`gfx1152`. Standard HIP compiled after disabling that option.
+The controlled Vulkan and HIP results are in the
+[Gemma 4 benchmark](doc-local/gemma4.md#benchmark). Enabling
+`GGML_HIP_ROCWMMA_FATTN=ON` failed compilation because the installed rocWMMA
+7.1 headers reported `Unsupported architecture` for `gfx1152`. Standard HIP
+compiled after disabling that option.
 
 Keep the HIP build only for future comparisons after ROCm or llama.cpp changes.
 
@@ -515,7 +432,7 @@ Review and commit only the local workflow files:
 
 ```bash
 git status --short
-git add README.local.md run_server.sh
+git add README.local.md run_server.sh doc-local
 git diff --cached
 git commit
 ```
@@ -559,26 +476,19 @@ rebase conflicts carefully rather than discarding upstream or local changes.
 
 ## Session learnings
 
-- Vulkan with Mesa RADV is the preferred backend for the Radeon 860M and this
-  model; it was faster than the tested ROCm 7.1 HIP build.
+- Vulkan with Mesa RADV is the preferred backend for the Radeon 860M; it was
+  faster than the tested ROCm 7.1 HIP build.
 - Integrated GPU memory can exceed the firmware's nominal VRAM aperture. The
-  6.7 GB model fully offloaded even though firmware reported 4 GiB VRAM.
+  tested models can use shared system memory beyond the reported 4 GiB VRAM.
 - A separate HIP or CPU build is not required for the current workflow.
 - The existing Vulkan build already contains the server, CLI, benchmark, and a
   working embedded Web UI. No further target is needed for built-in tools.
-- The current Gemma model's GGUF metadata includes a native tool-aware chat
-  template, and it emitted a valid structured tool call in a live test.
 - Built-in tools are convenient for a trusted local Web UI, but they are not a
   sandbox. Browser approval does not protect the underlying `/tools` endpoint.
 - `--tools` with an explicit list is preferable to `--agent` for controlled
   local use.
 - The launcher uses one server slot so the full 32768-token context is assigned
   to the active conversation instead of being divided among parallel slots.
-- Gemma 4 MTP uses the matching 423M `gemma4-assistant` sidecar on Vulkan0 and
-  defaults to drafting up to four tokens per speculative step.
-- A live MTP smoke test drafted 44 tokens, accepted 36 (81.8 percent), and
-  generated 48 tokens at 17.5 tokens/s. This confirms operation but is not a
-  controlled comparison with the earlier non-MTP benchmark.
 - `/tools` is an internal Web UI interface. External clients should own their
   command policy, approval, filesystem boundaries, and tool execution loop.
 - Keep the official mirror branch free of local commits. Rebase the personal
