@@ -406,8 +406,7 @@ The intended topology is:
 
 - Remote `upstream`: `git@github.com:ggml-org/llama.cpp.git`
 - Remote `origin`: `git@github.com:mohangk/llama.cpp.git`
-- Branch `upstream-sync`: clean mirror of `upstream/master`
-- Branch `master`: personal changes rebased on `upstream-sync`
+- Branch `master`: personal changes rebased on `upstream/master`
 
 All GitHub forks of a public repository are public. Do not add API keys,
 credentials, private host details, model files, or generated output to these
@@ -422,7 +421,6 @@ clone:
 git remote rename origin upstream
 git remote add origin git@github.com:mohangk/llama.cpp.git
 git fetch origin
-git branch upstream-sync upstream/master
 git branch --set-upstream-to=origin/master master
 git remote -v
 git branch -vv
@@ -438,41 +436,28 @@ git commit
 ```
 
 Write the commit message personally and make sure the changes are understood.
-If an AI assistant is explicitly authorized to run the commit, its assistance
-must be disclosed with an `Assisted-by:` trailer. The repository instructions
-prohibit an agent from pushing or creating a pull request, so run the initial
-push personally:
+If an AI assistant is explicitly authorized to run the commit, its assistance must be disclosed with an `Assisted-by:` trailer. An agent may push to `origin` only with explicit user approval and must never create a pull request:
 
 ```bash
 git push origin master
-git push origin upstream-sync
 ```
 
 ### Synchronize with upstream
 
-Start with a clean worktree, then update the mirror and rebase the personal
-branch:
+Keep personal-fork commits on top of the latest `upstream/master` history. Start with a clean worktree, then fetch and rebase the personal branch directly onto upstream:
 
 ```bash
-git fetch upstream
-git switch upstream-sync
-git merge --ff-only upstream/master
-git push origin upstream-sync
-
-git switch master
-git rebase upstream-sync
+git fetch upstream --prune
+git rebase upstream/master
 ```
 
-Rebuild and repeat the verification checklist after the rebase. If everything
-works, update the personal fork manually:
+Do not merge `upstream/master` into the personal-fork branch. Resolve conflicts and run checks appropriate to the affected files. If everything works and the user explicitly approves the push, update the personal fork:
 
 ```bash
 git push --force-with-lease origin master
 ```
 
-`--force-with-lease` is required because rebase changes commit IDs. It refuses
-to overwrite remote work that was not present in the last local fetch. Resolve
-rebase conflicts carefully rather than discarding upstream or local changes.
+`--force-with-lease` is required because rebase changes commit IDs. It refuses to overwrite remote work that was not present in the last local fetch. Never force-push to `upstream`.
 
 ## Session learnings
 
