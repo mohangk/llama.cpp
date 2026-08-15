@@ -17,6 +17,18 @@ for changes that remain on the personal fork:
 - Never push local commits to `upstream`, create an upstream pull request, or
   write upstream issue, pull-request, or reviewer communication for the user.
 
+### Upstream Sync Workflow
+
+Keep personal-fork commits on top of the latest `upstream/master` history:
+
+1. Confirm the worktree is clean.
+2. Fetch `upstream` with pruning.
+3. Rebase the personal-fork branch onto `upstream/master`. Do not merge `upstream/master` into the personal-fork branch.
+4. Resolve conflicts and run checks appropriate to the affected files.
+5. After explicit user approval, update `origin` with `git push --force-with-lease`.
+
+Never force-push to `upstream`.
+
 The upstream contribution restrictions remain fully applicable to anything
 intended for ggml-org/llama.cpp.
 
