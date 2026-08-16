@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 SERVER_BIN="${LLAMA_SERVER_BIN:-${REPO_ROOT}/build-vulkan-amd/bin/llama-server}"
 MODEL="${LLAMA_MODEL:-${HOME}/models/gemma-4-12B-qat/gemma-4-12B-it-qat-UD-Q4_K_XL.gguf}"
 MTP_MODEL="${LLAMA_MTP_MODEL:-$(dirname -- "${MODEL}")/mtp-gemma-4-12B-it.gguf}"

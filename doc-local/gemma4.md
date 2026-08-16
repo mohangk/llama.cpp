@@ -1,8 +1,6 @@
 # Gemma 4 local setup
 
-This document records the model-specific configuration and findings for the
-Gemma 4 12B setup used by `run_server.sh`. General AMD build, server-tool,
-security, and repository workflow notes remain in `README.local.md`.
+This document records the model-specific configuration and findings for the Gemma 4 12B setup used by `local-scripts/amd-ryzen-run.sh`. General server-tool, security, and repository workflow notes remain in `README.local.md`; machine-specific build notes are in the [AMD Ryzen laptop profile](machines/amd-ryzen.md).
 
 ## Current model
 
@@ -23,7 +21,7 @@ not need a chat-template override.
 Start the server from the repository root or any other directory:
 
 ```bash
-./run_server.sh
+./local-scripts/amd-ryzen-run.sh
 ```
 
 Open `http://127.0.0.1:8080` in a browser and stop the server with `Ctrl-C`.
@@ -47,7 +45,7 @@ LLAMA_MTP_MODEL=/path/to/mtp-model.gguf \
 LLAMA_SPEC_DRAFT_N_MAX=3 \
 LLAMA_PORT=8081 \
 LLAMA_CTX_SIZE=16384 \
-./run_server.sh
+./local-scripts/amd-ryzen-run.sh
 ```
 
 `LLAMA_SERVER_BIN` can select another server build. The launcher deliberately
@@ -186,7 +184,7 @@ The run followed [the local evaluation protocol](local-evals.md): one warmup,
 then the four fixed prompts three times each at temperature zero, seed 42, and
 a 64-token response cap. Each configuration generated 765 measured target
 tokens. Baseline and draft windows two and three form the standard matrix;
-window four was added because it was the `run_server.sh` default when the
+window four was added because it was the `local-scripts/amd-ryzen-run.sh` default when the
 evaluation began.
 
 ### Performance

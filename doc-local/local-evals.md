@@ -1,10 +1,6 @@
 # Local model evaluation protocol
 
-This document defines the repeatable local evaluation used to compare models,
-quantizations, inference backends, and speculative decoding configurations on
-this laptop. It separates a small deterministic performance test from
-capability checks so results remain comparable without treating token speed as
-the only useful outcome.
+This document defines the repeatable local evaluation used to compare models, quantizations, inference backends, and speculative decoding configurations across the machine profiles. It separates a small deterministic performance test from capability checks so results remain comparable without treating token speed as the only useful outcome.
 
 ## Evaluation registry
 
@@ -24,8 +20,8 @@ Record these fields before testing:
 - Date and local time.
 - llama.cpp version and Git commit.
 - Build directory and relevant CMake options.
-- Backend, device name, driver, and Vulkan ICD.
-- Laptop power source and power profile.
+- Machine profile, backend, device name, driver, and backend-specific runtime selection.
+- Power source and power profile when applicable.
 - Target, projector, and drafter paths.
 - File sizes, SHA-256 hashes, repository, and pinned repository revision.
 - GGUF architecture, quantization, native context, embedding width, tokenizer
