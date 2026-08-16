@@ -1,9 +1,6 @@
 # Qwen 3.6 27B MTP experiment
 
-This document records the local Qwen 3.6 27B Multi-Token Prediction (MTP)
-experiment on the AMD Radeon 860M Vulkan setup. The initial experiment is
-deliberately separate from `run_server.sh`; the working Gemma 4 launcher stays
-unchanged until Qwen has passed functional and performance checks.
+This document records the local Qwen 3.6 27B Multi-Token Prediction (MTP) experiment on the AMD Radeon 860M Vulkan setup. The initial experiment is deliberately separate from `local-scripts/amd-ryzen-run.sh`; the working Gemma 4 launcher stays unchanged until Qwen has passed functional and performance checks.
 
 ## Goals
 
