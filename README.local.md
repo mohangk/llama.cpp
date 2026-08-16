@@ -1,66 +1,82 @@
 # Local llama.cpp operating notes
 
-This file is the operating manual for this clone. It records the local build,
-server, tool-access, security, performance, and repository-management choices
-that were verified on this laptop. It is intentionally separate from the
-upstream `README.md` and is intended to be tracked only in the personal fork.
+This is the operating manual for the personal fork. It separates shared server and repository policy from machine-specific build and performance notes.
 
-## Current state
+## Machine profiles
 
-The local Vulkan build is complete and usable:
+| Profile | Hardware | Preferred backend | Status | Documentation |
+| --- | --- | --- | --- | --- |
+| `minipc-nvidia` | Intel Core Ultra 9 185H, NVIDIA RTX 3090, 93 GiB RAM | CUDA | Validated | [Mini PC NVIDIA profile](doc-local/machines/minipc-nvidia.md) |
+| `amd-ryzen` | AMD Ryzen AI 7 PRO 350, Radeon 860M, 58 GiB RAM | Vulkan RADV | Validated | [AMD Ryzen laptop profile](doc-local/machines/amd-ryzen.md) |
+| Mac | Not inspected in this workflow | Deferred | Inspect on the Mac before choosing flags | Not created |
 
-- `build-vulkan-amd/bin/llama-cli`
-- `build-vulkan-amd/bin/llama-server`
-- `build-vulkan-amd/bin/llama-bench`
-- Release and native CPU optimization are enabled.
-- Vulkan device discovery, CLI inference, server inference, and benchmarking
-  have been tested.
-- The embedded Web UI and built-in llama-server tools have been tested.
-- The current launcher targets the validated
-  [Gemma 4 setup](doc-local/gemma4.md).
-- Qwen 3.6 27B text, vision, tool calling, and MTP have been validated; see
-  [the local Qwen MTP results](doc-local/qwen36-mtp-plan.md).
-- Repeatable model and backend comparisons use the
-  [local evaluation protocol](doc-local/local-evals.md).
-- Vulkan substantially outperformed the tested HIP build on this machine.
-
-Nothing else needs to be built for local chat, the HTTP API, the Web UI, basic
-agent tools, or benchmarking. Rebuild only after updating llama.cpp or changing
-the build configuration.
+Do not copy performance conclusions between profiles. Compiler, driver, memory, power, and thermal differences can be larger than small build-option gains.
 
 ## Quick start
 
-The current launcher starts the local Gemma 4 configuration:
+### NVIDIA mini PC
+
+Build the production CUDA baseline:
 
 ```bash
-./run_server.sh
+./local-scripts/minipc-nvidia-build.sh baseline
 ```
 
-Open `http://127.0.0.1:8080` in a browser. Stop the server with `Ctrl-C`.
-
-Model paths, environment overrides, MTP behavior, and validated benchmark
-results are recorded in [the Gemma 4 document](doc-local/gemma4.md). The Qwen
-experiment currently uses its documented direct server command rather than
-this Gemma-specific launcher.
-
-## TODO
-
-- Create a Qwen 3.6 server launcher using the validated target, vision
-  projector, MTP sidecar, and three-token draft window. Decide whether this
-  should be a separate script or a generalized model-selecting replacement for
-  `run_server.sh`, while preserving loopback binding and the explicit tool
-  allowlist.
-
-Monitor the AMD GPU from another terminal:
+Run a smoke benchmark with a readable absolute model path:
 
 ```bash
-amd-smi metric -g 0 -u -c -t -p -w 1
+LLAMA_MODEL=/path/to/model.gguf \
+  ./local-scripts/minipc-nvidia-bench.sh baseline smoke
 ```
+
+Start the model-neutral server launcher:
+
+```bash
+LLAMA_MODEL=/path/to/model.gguf \
+  ./local-scripts/minipc-nvidia-run.sh
+```
+
+The available Qwen 3.6 27B benchmark artifact and its checksum are recorded in the [mini PC profile](doc-local/machines/minipc-nvidia.md#benchmark-artifact).
+
+### AMD Ryzen laptop
+
+Build the validated Vulkan profile:
+
+```bash
+./local-scripts/amd-ryzen-build.sh
+```
+
+The preserved Gemma 4 launcher is:
+
+```bash
+./local-scripts/amd-ryzen-run.sh
+```
+
+Its model defaults, Vulkan environment, and MTP behavior are documented in the [Gemma 4 setup](doc-local/gemma4.md) and the [AMD machine profile](doc-local/machines/amd-ryzen.md).
+
+## Local scripts
+
+| Script | Purpose |
+| --- | --- |
+| `local-scripts/minipc-nvidia-build.sh` | Build the selected CUDA baseline for the RTX 3090. Comparison arguments remain available for future retesting. |
+| `local-scripts/minipc-nvidia-run.sh` | Run a model supplied through `LLAMA_MODEL` on the selected baseline and `CUDA0`. |
+| `local-scripts/minipc-nvidia-bench.sh` | Run smoke, core, or tuning benchmarks and retain JSON, telemetry, metadata, and a Markdown summary. |
+| `local-scripts/amd-ryzen-build.sh` | Build the validated Vulkan profile for the Radeon 860M laptop. |
+| `local-scripts/amd-ryzen-run.sh` | Run the validated AMD Vulkan Gemma 4 configuration. |
+
+Build directories and raw benchmark results are not tracked. Mini PC benchmark results default to `${XDG_STATE_HOME:-$HOME/.local/state}/llama.cpp/benchmarks/minipc-nvidia/`.
+
+## Evaluation documents
+
+- [Local evaluation protocol](doc-local/local-evals.md)
+- [Gemma 4 setup and AMD results](doc-local/gemma4.md)
+- [Qwen 3.6 27B AMD MTP experiment](doc-local/qwen36-mtp-plan.md)
+
+Add results to a machine profile or model result document only after recording the exact machine, llama.cpp revision, backend, build options, driver, model hash, and runtime settings.
 
 ## Server tools
 
-This checkout contains experimental built-in tools in llama-server. The
-launcher enables these tools explicitly:
+The local server launchers enable these experimental built-in tools explicitly:
 
 - `read_file`: read a file or selected line range
 - `file_glob_search`: find files with a glob pattern
@@ -68,31 +84,21 @@ launcher enables these tools explicitly:
 - `exec_shell_command`: execute a command through `sh -c`
 - `write_file`: create or overwrite a file
 - `edit_file`: replace text in a file
-- `get_datetime`: return the server's date and time
+- `get_datetime`: return the server date and time
 
-The explicit list is intentional. `--agent` is not used because it also
-enables the MCP CORS proxy and implicitly enables every built-in tool. An
-explicit list also prevents future llama.cpp tools from becoming available
-without review.
+The explicit list prevents new llama.cpp tools from becoming available without review. The launchers do not use `--agent` because it also enables the MCP CORS proxy and implicitly enables every built-in tool.
 
 ### Using tools in the Web UI
 
-1. Start `./run_server.sh` and open the Web UI.
-2. Ask the model to perform a concrete action, such as reporting the current
-   time or reading a known file.
+1. Start the machine-specific run script and open `http://127.0.0.1:8080`.
+2. Ask the model to perform a concrete action, such as reporting the current time or reading a known file.
 3. Inspect the proposed tool and its arguments.
 4. Select `Allow once` only when the call is expected.
-5. Deny unexpected calls, especially commands or writes suggested by content
-   the model just read.
+5. Deny unexpected calls, especially commands or writes suggested by content the model just read.
 
-The UI also offers persistent approval choices. Do not use them for this
-configuration. If one is selected accidentally, revoke it in the Chat Tools
-settings. Permissions are stored in browser local storage, not enforced by the
-server.
+Do not use persistent approval for this configuration. If it is selected accidentally, revoke it in the Chat Tools settings. Permissions are stored in browser local storage and are not enforced by the server.
 
 ### Tool implementation limits
-
-The limits observed in this checkout are:
 
 - `read_file` returns at most 16 KiB unless a line range narrows the request.
 - Shell output is limited to 16 KiB.
@@ -100,11 +106,7 @@ The limits observed in this checkout are:
 - File searches are bounded to 100 results.
 - Paths are passed to the host filesystem without a configured allowed root.
 
-`GET /tools` lists the enabled built-ins and `POST /tools` invokes one. These
-endpoints are intended for llama-server's Web UI and are explicitly documented
-as internal and subject to change. A separate application should use the
-OpenAI-compatible chat API and implement its own tool loop instead of depending
-on `/tools`.
+`GET /tools` lists enabled built-ins and `POST /tools` invokes one. These endpoints are internal to llama-server and can change. External applications should use the OpenAI-compatible chat API and implement their own tool loop.
 
 Relevant upstream material:
 
@@ -115,292 +117,48 @@ Relevant upstream material:
 
 ## Security model
 
-This is a high-trust local configuration. The enabled tools run with the same
-permissions as the user who starts llama-server.
+This is a high-trust local configuration. Enabled tools run with the permissions of the user who starts llama-server.
 
 - File reads, writes, and edits are not confined to this repository.
-- Shell commands run through `sh -c` and inherit the server's environment,
-  current user, `PATH`, network access, and filesystem access.
-- The launcher changes to the repository root before starting the server, so
-  relative shell paths start here. This is a convenience, not a sandbox.
-- A model can propose harmful calls because of a user prompt, hallucination, or
-  prompt injection in a file or command output.
+- Shell commands inherit the server environment, current user, `PATH`, network access, and filesystem access.
+- Launchers change to the repository root, so relative shell paths start here. This is not a sandbox.
+- A model can propose harmful calls because of a prompt, hallucination, or prompt injection.
 - CORS restrictions do not provide authentication.
 
-The server binds only to `127.0.0.1` and has no API key. This accepts the risk
-that another process running on the laptop can call the API. More importantly,
-Web UI approval is client-side only: a direct local `POST /tools` request does
-not display an approval prompt. Do not expose port 8080 through a LAN binding,
-reverse proxy, tunnel, container port publication, or firewall rule.
+The server binds only to `127.0.0.1` and has no API key. Another local process can call the API directly, and a direct `POST /tools` request does not display a Web UI approval prompt. Do not expose port 8080 through a LAN binding, reverse proxy, tunnel, container port publication, or firewall rule.
 
-Before opening files from an untrusted project, consider using a separate Unix
-account, container, or virtual machine. The current launcher intentionally does
-not claim to provide a filesystem or command sandbox.
+Use a separate Unix account, container, or virtual machine before opening untrusted projects. The local launchers do not claim to provide a filesystem or command sandbox.
 
-## Verification checklist
+## Shared verification checklist
 
-After changing the launcher, model, build, or llama.cpp revision:
+After changing a launcher, model, build, or llama.cpp revision:
 
 ```bash
-bash -n run_server.sh
-./build-vulkan-amd/bin/llama-server --help | grep -E -- '--tools|--ui|--jinja'
-./run_server.sh
+bash -n local-scripts/*.sh
+git diff --check
 ```
 
-With the server running:
+Verify the selected binary and device:
+
+```bash
+./build-minipc-nvidia/bin/llama-cli --version
+./build-minipc-nvidia/bin/llama-cli --list-devices
+```
+
+With a server running:
 
 ```bash
 curl --fail http://127.0.0.1:8080/health
+curl --fail http://127.0.0.1:8080/v1/models
 curl --fail http://127.0.0.1:8080/tools
 curl --fail --compressed --output /dev/null http://127.0.0.1:8080/
 ```
 
-The root response is gzip-compressed. Use `curl --compressed`; a client without
-gzip support can report an error even when the UI works in a browser.
-
-Use `ss -ltnp` to confirm that the process listens only on `127.0.0.1:8080`.
-Then test these calls through the Web UI with `Allow once`:
-
-- Return the current date and time.
-- Read a known non-sensitive file.
-- Run `pwd` and confirm it returns the repository root.
-- Create, edit, read, and delete a disposable file.
-
-## AMD GPU build and performance
-
-### Recommendation
-
-Use the Vulkan backend with Mesa RADV on this laptop.
-
-Vulkan was substantially faster than the tested HIP/ROCm backend. Vulkan also
-handled the integrated GPU's shared system memory without a special
-unified-memory environment variable. The model-specific comparison is in the
-[Gemma 4 benchmark](doc-local/gemma4.md#benchmark).
-
-### System context
-
-The system inspected on 2026-07-19 had:
-
-- OS: Fedora Linux 44 Workstation
-- Kernel: Linux 7.1.3-201.fc44.x86_64
-- CPU: AMD Ryzen AI 7 PRO 350, 8 cores and 16 threads
-- CPU features: AVX2, AVX-512, AVX-VNNI, AVX512-VNNI, F16C, and FMA
-- GPU: AMD Radeon 860M integrated graphics
-- GPU architecture: `gfx1152`
-- GPU compute units: 8
-- Kernel driver: `amdgpu`
-- Vulkan driver: Mesa RADV 26.1.4
-- Vulkan API: 1.4
-- System memory: 58 GiB
-- Firmware-reported VRAM: 4096 MiB
-- Repository revision: `571d0d540`, build 10068
-
-Although the firmware reports 4 GiB VRAM, this is an integrated GPU with
-unified memory. llama.cpp's Vulkan backend reported about 34 GiB usable device
-memory and fully offloaded models larger than the dedicated VRAM aperture.
-
-Detected Vulkan capabilities included FP16 and integer dot products, KHR
-cooperative matrices, 64 KiB shared memory, and UMA support.
-
-### Fedora dependencies
-
-```bash
-sudo dnf install \
-  gcc-c++ cmake make ccache \
-  vulkan-loader-devel vulkan-tools mesa-vulkan-drivers \
-  glslc spirv-headers-devel
-```
-
-The backend requires the Vulkan loader and headers, Mesa RADV, `glslc`, and
-SPIR-V headers including `spirv/unified1/spirv.hpp`.
-
-Verify the driver:
-
-```bash
-vulkaninfo --summary
-```
-
-The expected device is:
-
-```text
-AMD Radeon 860M Graphics (RADV KRACKAN1)
-```
-
-Mesa also installs software and unrelated ICD files. The launcher restricts
-the Vulkan loader to RADV with:
-
-```bash
-export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
-```
-
-This is optional for llama.cpp on this machine, but makes selection
-deterministic and avoids unrelated Vulkan loader warnings.
-
-### Recommended build
-
-Run from the repository root:
-
-```bash
-cmake -S . -B build-vulkan-amd \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DGGML_VULKAN=ON \
-  -DGGML_HIP=OFF \
-  -DGGML_NATIVE=ON \
-  -DLLAMA_BUILD_TESTS=OFF \
-  -DLLAMA_BUILD_SERVER=ON \
-  -DLLAMA_BUILD_UI=OFF
-
-cmake --build build-vulkan-amd \
-  --target llama-cli llama-bench llama-server \
-  -j 16
-```
-
-Important choices:
-
-- `CMAKE_BUILD_TYPE=Release` enables optimized compilation.
-- `GGML_VULKAN=ON` builds the Vulkan backend.
-- `GGML_HIP=OFF` avoids loading a second GPU backend.
-- `GGML_NATIVE=ON` uses `-march=native` for CPU fallback work.
-- `LLAMA_BUILD_TESTS=OFF` avoids unnecessary test binaries.
-- `LLAMA_BUILD_SERVER=ON` is required by this checkout to generate
-  `llama-cli`, because the CLI reuses server implementation code.
-- `LLAMA_BUILD_UI=OFF` records that a fresh UI build was not requested. This
-  checkout still supplied usable embedded UI assets to the tested server.
-
-Leave Vulkan validation, result checking, and shader debugging disabled for a
-performance build. The first build generates the shader set; later builds reuse
-generated output and ccache.
-
-### Verify the build
-
-```bash
-export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
-
-./build-vulkan-amd/bin/llama-cli --version
-./build-vulkan-amd/bin/llama-cli --list-devices
-```
-
-Expected output includes:
-
-```text
-Vulkan0: AMD Radeon 860M Graphics (RADV KRACKAN1)
-```
-
-If `Vulkan0` is absent, check `vulkaninfo --summary`, the RADV ICD path, and
-permissions on `/dev/dri/renderD128` before rebuilding.
-
-### Run the CLI
-
-```bash
-export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
-
-./build-vulkan-amd/bin/llama-cli \
-  --model /path/to/model.gguf \
-  --device Vulkan0 \
-  --gpu-layers 99 \
-  --flash-attn auto \
-  --ctx-size 4096
-```
-
-`--gpu-layers 99` requests full offload for models with fewer than 99 layers.
-KV-cache offload and memory mapping are enabled by default and worked well. Do
-not add `--no-kv-offload` when maximizing GPU use. Larger contexts increase KV
-cache memory, so monitor memory and performance rather than assuming a single
-ideal maximum.
-
-### Reproduce the Vulkan benchmark
-
-```bash
-export VK_DRIVER_FILES=/usr/share/vulkan/icd.d/radeon_icd.x86_64.json
-
-./build-vulkan-amd/bin/llama-bench \
-  --model /path/to/model.gguf \
-  --n-prompt 512 \
-  --n-gen 64 \
-  --repetitions 3 \
-  --n-gpu-layers 99 \
-  --device Vulkan0 \
-  --flash-attn auto \
-  --threads 8
-```
-
-Use [the local evaluation protocol](doc-local/local-evals.md) for comparable
-model and speculative-decoding measurements. Power mode, temperature,
-background work, context size, quantization, and driver updates affect results.
-The APU shares thermal and power limits between CPU and GPU.
-
-### Vulkan versus HIP
-
-ROCm 7.1 detected the GPU as `gfx1152`. The targeted HIP benchmark build in
-`build-hip-amd` used:
-
-```text
-GGML_HIP=ON
-GPU_TARGETS=gfx1152
-GGML_NATIVE=ON
-GGML_HIP_ROCWMMA_FATTN=OFF
-```
-
-HIP required this variable to expose system memory for a model larger than the
-dedicated VRAM aperture:
-
-```bash
-export GGML_CUDA_ENABLE_UNIFIED_MEMORY=1
-```
-
-The controlled Vulkan and HIP results are in the
-[Gemma 4 benchmark](doc-local/gemma4.md#benchmark). Enabling
-`GGML_HIP_ROCWMMA_FATTN=ON` failed compilation because the installed rocWMMA
-7.1 headers reported `Unsupported architecture` for `gfx1152`. Standard HIP
-compiled after disabling that option.
-
-Keep the HIP build only for future comparisons after ROCm or llama.cpp changes.
-
-## Build maintenance
-
-After updating llama.cpp, configure and build the same directory again:
-
-```bash
-cmake -S . -B build-vulkan-amd \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DGGML_VULKAN=ON \
-  -DGGML_HIP=OFF \
-  -DGGML_NATIVE=ON \
-  -DLLAMA_BUILD_TESTS=OFF \
-  -DLLAMA_BUILD_SERVER=ON \
-  -DLLAMA_BUILD_UI=OFF
-
-cmake --build build-vulkan-amd \
-  --target llama-cli llama-bench llama-server \
-  -j 16
-```
-
-Use a new build directory if CMake says its cache was created elsewhere. Do not
-copy `CMakeCache.txt` between build directories.
-
-Build extra targets only when needed:
-
-- `llama-quantize`: convert an existing GGUF to another quantization
-- `llama-perplexity`: evaluate model perplexity
-- `llama-embedding`: generate embeddings
-- `llama-imatrix`: produce an importance matrix for quantization
-- `llama-gguf-split`: split or combine GGUF files
-- `llama`: build the newer unified application target
-
-Example:
-
-```bash
-cmake --build build-vulkan-amd --target llama-quantize -j 16
-```
-
-Building every target adds compile time and disk use without improving normal
-inference performance.
+Use `ss -ltnp` to confirm that the process listens only on `127.0.0.1:8080`. Test a known file read and `pwd` through the Web UI with `Allow once`, then stop the server and confirm the port is closed.
 
 ## Personal fork workflow
 
-The goal is to preserve `README.local.md` and `run_server.sh` in a personal
-public fork without treating them as an upstream llama.cpp contribution. No
-pull request is planned.
+The local documentation and scripts belong only to the personal fork. No upstream pull request is planned.
 
 The intended topology is:
 
@@ -408,73 +166,33 @@ The intended topology is:
 - Remote `origin`: `git@github.com:mohangk/llama.cpp.git`
 - Branch `master`: personal changes rebased on `upstream/master`
 
-All GitHub forks of a public repository are public. Do not add API keys,
-credentials, private host details, model files, or generated output to these
-commits.
+All GitHub forks of a public repository are public. Do not add API keys, credentials, private host details, model files, generated output, or raw benchmark artifacts to these commits.
 
-### Establish the fork
-
-First create `mohangk/llama.cpp` with GitHub's Fork action. Then configure this
-clone:
-
-```bash
-git remote rename origin upstream
-git remote add origin git@github.com:mohangk/llama.cpp.git
-git fetch origin
-git branch --set-upstream-to=origin/master master
-git remote -v
-git branch -vv
-```
-
-Review and commit only the local workflow files:
+Review and commit only intended local files:
 
 ```bash
 git status --short
-git add README.local.md run_server.sh doc-local
+git add README.local.md local-scripts doc-local
 git diff --cached
 git commit
 ```
 
-Write the commit message personally and make sure the changes are understood.
-If an AI assistant is explicitly authorized to run the commit, its assistance must be disclosed with an `Assisted-by:` trailer. An agent may push to `origin` only with explicit user approval and must never create a pull request:
-
-```bash
-git push origin master
-```
+If an AI assistant is explicitly authorized to commit, disclose its assistance with an `Assisted-by:` trailer. An agent may push to `origin` only with explicit user approval and must never create a pull request.
 
 ### Synchronize with upstream
 
-Keep personal-fork commits on top of the latest `upstream/master` history. Start with a clean worktree, then fetch and rebase the personal branch directly onto upstream:
+Keep personal-fork commits on top of the latest `upstream/master` history:
 
 ```bash
+git status --short
 git fetch upstream --prune
 git rebase upstream/master
 ```
 
-Do not merge `upstream/master` into the personal-fork branch. Resolve conflicts and run checks appropriate to the affected files. If everything works and the user explicitly approves the push, update the personal fork:
+Do not merge `upstream/master` into the personal branch. Resolve conflicts and run checks appropriate to affected files. After explicit user approval, update the fork with:
 
 ```bash
 git push --force-with-lease origin master
 ```
 
-`--force-with-lease` is required because rebase changes commit IDs. It refuses to overwrite remote work that was not present in the last local fetch. Never force-push to `upstream`.
-
-## Session learnings
-
-- Vulkan with Mesa RADV is the preferred backend for the Radeon 860M; it was
-  faster than the tested ROCm 7.1 HIP build.
-- Integrated GPU memory can exceed the firmware's nominal VRAM aperture. The
-  tested models can use shared system memory beyond the reported 4 GiB VRAM.
-- A separate HIP or CPU build is not required for the current workflow.
-- The existing Vulkan build already contains the server, CLI, benchmark, and a
-  working embedded Web UI. No further target is needed for built-in tools.
-- Built-in tools are convenient for a trusted local Web UI, but they are not a
-  sandbox. Browser approval does not protect the underlying `/tools` endpoint.
-- `--tools` with an explicit list is preferable to `--agent` for controlled
-  local use.
-- The launcher uses one server slot so the full 32768-token context is assigned
-  to the active conversation instead of being divided among parallel slots.
-- `/tools` is an internal Web UI interface. External clients should own their
-  command policy, approval, filesystem boundaries, and tool execution loop.
-- Keep the official mirror branch free of local commits. Rebase the personal
-  branch onto it and use `--force-with-lease` when updating the personal fork.
+Never force-push to `upstream`.
