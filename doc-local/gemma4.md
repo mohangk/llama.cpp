@@ -258,6 +258,21 @@ Use a maximum draft window of three for the measured mixed workload. The
 launcher now defaults to three based on this result. Set
 `LLAMA_SPEC_DRAFT_N_MAX` explicitly to reproduce another measured window.
 
+## Post-update validation
+
+The Gemma baseline and MTP max-three configurations were rerun on 2026-08-23 after updating to llama.cpp build 10592 at personal-fork commit `486bd5b32`. The laptop was connected to AC power, and the model, assistant, Vulkan device, 32768-token context, prompt order, warmup, seed, temperature, and 64-token response cap matched the controlled evaluation above.
+
+| Configuration | Prompt tok/s | Generation tok/s | Median gen tok/s | Drafted | Accepted | Acceptance |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline | 43.20 | 10.08 | 9.90 | 0 | 0 | N/A |
+| MTP, max 3 | 38.63 | 16.74 | 17.23 | 655 | 532 | 81.2% |
+
+MTP improved aggregate generation by 66.2 percent and median generation by 74.0 percent over the new baseline. Baseline aggregate performance was 1.8 percent below the July result, while MTP aggregate performance was 13.7 percent below it. Draft and accepted counts exactly matched the July max-three run, so the assistant remained functionally stable even though its speedup decreased.
+
+The post-run system-wide memory samples were 3838 MiB visible VRAM plus 6074 MiB GTT for baseline and 3926 MiB visible VRAM plus 6534 MiB GTT for MTP. Temperatures were 60 C after baseline and 55 C after MTP. All responses were non-empty and coherent, finish reasons matched the earlier run, and the server remained healthy.
+
+A preliminary run on battery was excluded because it reduced baseline and MTP generation to 7.79 and 10.98 tokens per second. Power state must therefore be checked before using these results for future comparisons.
+
 ## Verified findings
 
 - The target fully offloaded through Vulkan despite exceeding the firmware's

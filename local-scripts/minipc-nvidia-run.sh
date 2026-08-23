@@ -15,7 +15,7 @@ UBATCH_SIZE="${LLAMA_UBATCH_SIZE:-512}"
 FLASH_ATTN="${LLAMA_FLASH_ATTN:-on}"
 GPU_LAYERS="${LLAMA_GPU_LAYERS:-999}"
 SPEC_DRAFT_N_MAX="${LLAMA_SPEC_DRAFT_N_MAX:-3}"
-TOOLS="read_file,file_glob_search,grep_search,exec_shell_command,write_file,edit_file,get_datetime"
+TOOLS="read_file,file_glob_search,grep_search,exec_shell_command,write_file,edit_file,get_info"
 OPTIONAL_ARGS=()
 
 BUILD_DIR="${REPO_ROOT}/build-minipc-nvidia"
