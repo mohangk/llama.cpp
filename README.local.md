@@ -84,7 +84,7 @@ The local server launchers enable these experimental built-in tools explicitly:
 - `exec_shell_command`: execute a command through `sh -c`
 - `write_file`: create or overwrite a file
 - `edit_file`: replace text in a file
-- `get_datetime`: return the server date and time
+- `get_info`: return the server OS and working directory
 
 The explicit list prevents new llama.cpp tools from becoming available without review. The launchers do not use `--agent` because it also enables the MCP CORS proxy and implicitly enables every built-in tool.
 

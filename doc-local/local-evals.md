@@ -8,6 +8,7 @@ This document defines the repeatable local evaluation used to compare models, qu
 | --- | --- | --- | --- |
 | 2026-07-19 | Gemma 4 12B QAT Q4 | Vulkan, AMD Radeon 860M | [Baseline and MTP evaluation](gemma4.md#controlled-local-evaluation) |
 | 2026-07-19 | Qwen 3.6 27B Q4_K_M | Vulkan, AMD Radeon 860M | [Baseline and MTP evaluation](qwen36-mtp-plan.md) |
+| 2026-08-23 | Gemma 4 12B QAT Q4 | Vulkan, AMD Radeon 860M | [Post-update validation](gemma4.md#post-update-validation) |
 
 Add one result document per materially different model or setup. Do not
 overwrite an older result after changing the llama.cpp revision, backend,

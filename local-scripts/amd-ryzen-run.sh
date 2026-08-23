@@ -11,7 +11,7 @@ CTX_SIZE="${LLAMA_CTX_SIZE:-32768}"
 SPEC_DRAFT_N_MAX="${LLAMA_SPEC_DRAFT_N_MAX:-3}"
 ENABLE_MTP="${LLAMA_ENABLE_MTP:-1}"
 VULKAN_ICD="/usr/share/vulkan/icd.d/radeon_icd.x86_64.json"
-TOOLS="read_file,file_glob_search,grep_search,exec_shell_command,write_file,edit_file,get_datetime"
+TOOLS="read_file,file_glob_search,grep_search,exec_shell_command,write_file,edit_file,get_info"
 MTP_ARGS=()
 
 if [[ ! -x "${SERVER_BIN}" ]]; then
